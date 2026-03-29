@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Link Up Social 🤝 - Cliente</title>
+   
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --azul-linkup: #0056b3; --verde-acao: #28a745; --bg: #f4f7f6; --branco: #ffffff;
+        }
+        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { margin: 0; background-color: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+        header {
+            background: linear-gradient(135deg, var(--azul-linkup) 0%, #2980b9 100%);
+            color: white; padding: 15px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 1000;
+        }
+        header h1 { margin: 0; font-size: 1.3rem; }
+
+        #map { height: 35vh; width: 100%; border-bottom: 4px solid var(--azul-linkup); }
+
+        #lista-container {
+            flex: 1; padding: 20px; overflow-y: auto; background-color: var(--bg);
+            border-radius: 25px 25px 0 0; margin-top: -20px; z-index: 2; position: relative;
+        }
+
+        .card {
+            background: var(--branco); border-radius: 15px; padding: 15px; margin-bottom: 12px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-left: 6px solid var(--azul-linkup);
+            display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+        }
+        .card h3 { margin: 0; font-size: 1.1rem; color: #333; }
+        .card p { margin: 2px 0; font-size: 0.8rem; color: #777; }
+        .cnpj-tag { font-size: 0.75rem; color: var(--azul-linkup); font-weight: bold; }
+
+        /* Modais */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 2000; display: none; backdrop-filter: blur(4px); }
+        .modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; border-radius: 20px; padding: 20px; width: 90%; max-width: 400px;
+            max-height: 90vh; overflow-y: auto; z-index: 2100; display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+        .fechar { position: absolute; top: 10px; right: 15px; font-size: 1.5rem; border: none; background: none; cursor: pointer; color: #bbb; }
+
+        .item-necessidade {
+            background: #f8f9fa; border: 1px solid #eee; padding: 12px; margin-bottom: 8px;
+            border-radius: 10px; font-weight: 600; color: var(--azul-linkup); cursor: pointer;
+        }
+
+        .form-campo { margin-bottom: 12px; }
+        .form-campo label { display: block; font-size: 0.8rem; font-weight: bold; color: var(--azul-linkup); margin-bottom: 4px; }
+        .form-campo input, .form-campo textarea { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 10px; font-size: 0.9rem; }
+        .form-campo textarea { resize: none; height: 80px; }
+
+        .btn-acao {
+            background: var(--verde-acao); color: white; border: none; width: 100%;
+            padding: 15px; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 10px;
+        }
+        .btn-google { background: #fff; border: 2px solid var(--azul-linkup); color: var(--azul-linkup); padding: 10px; width: 100%; border-radius: 10px; margin-bottom: 15px; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Link Up Social 🤝</h1>
+</header>
+
+<div id="map"></div>
+
+<div id="lista-container">
+    <div style="font-weight: bold; color: #888; margin-bottom: 15px;">📍 Instituições em Cruzeiro</div>
+    <div id="render-lista">Carregando instituições...</div>
+</div>
+
+<div class="overlay" id="overlay-detalhes" onclick="fecharModais()"></div>
+<div class="modal" id="modal-detalhes">
+    <button class="fechar" onclick="fecharModais()">×</button>
+    <h2 id="m-nome">Nome</h2>
+    <p id="m-desc" style="font-size: 0.9rem; color: #666;"></p>
+    <button class="btn-google" id="btn-rota">📍 Abrir Rota no Google Maps</button>
+    <hr>
+    <p style="font-weight: bold;">O que eles precisam hoje:</p>
+    <div id="m-lista-itens"></div>
+    <button class="btn-google" style="border-style: dashed; margin-top: 10px;" onclick="prepararAgendamento('Serviço Voluntário Espontâneo', true)">✨ Oferecer Outro Serviço</button>
+</div>
+
+<div class="overlay" id="overlay-agenda" onclick="fecharModais()"></div>
+<div class="modal" id="modal-agenda">
+    <button class="fechar" onclick="fecharModais()">×</button>
+    <h3>Agendar Entrega/Ação</h3>
+    <p>Item/Tipo: <strong id="resumo-item" style="color: var(--verde-acao);"></strong></p>
+   
+    <div class="form-campo" id="container-detalhe-servico" style="display: none;">
+        <label>Descreva o que pretende fazer:</label>
+        <textarea id="f-detalhe-servico" placeholder="Ex: Pintar o muro, organizar estoque, dar aula..."></textarea>
+    </div>
+
+    <div style="display: flex; gap: 10px;">
+        <div class="form-campo" style="flex: 1;">
+            <label>Data:</label>
+            <input type="date" id="f-data">
+        </div>
+        <div class="form-campo" style="flex: 1;">
+            <label>Horário:</label>
+            <input type="time" id="f-hora">
+        </div>
+    </div>
+    <div class="form-campo">
+        <label>Seu Nome:</label>
+        <input type="text" id="f-nome" placeholder="Seu nome completo">
+    </div>
+    <div class="form-campo">
+        <label>Sua Chapa (ID):</label>
+        <input type="text" id="f-chapa" placeholder="Número da chapa">
+    </div>
+
+    <button class="btn-acao" onclick="enviarWhatsApp()">🚀 ENVIAR PARA WHATSAPP</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbxtbwFaJXt-U4oIU7d175UF_QEQInOjQBIDOLqmxP8b1gz3_YWR4SARh-r2OrHD-3c/exec";
+    let instGlobal = [];
+    let doacGlobal = [];
+    let selecionada = null;
+    let itemSelecionado = "";
+    let ehServicoEspontaneo = false;
+
+    const map = L.map('map', { zoomControl: false }).setView([-22.5735, -44.9708], 14);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+    async function carregarDados() {
+        try {
+            const res = await fetch(API_URL);
+            const data = await res.json();
+            instGlobal = data.instituicoes;
+            doacGlobal = data.doacoes;
+            renderizar();
+        } catch (e) {
+            document.getElementById('render-lista').innerText = "Erro ao carregar dados.";
+        }
+    }
+
+    function renderizar() {
+        const lista = document.getElementById('render-lista');
+        lista.innerHTML = "";
+        instGlobal.forEach(inst => {
+            L.marker([inst.lat, inst.lng]).addTo(map).on('click', () => abrirDetalhes(inst));
+
+            const div = document.createElement('div');
+            div.className = 'card';
+            div.innerHTML = `
+                <div>
+                    <h3>${inst.nome}</h3>
+                    <p>${inst.tipo}</p>
+                    <span class="cnpj-tag">CNPJ: ${inst.cnpj || 'Consultar'}</span>
+                </div>
+                <span>❤️</span>`;
+            div.onclick = () => { map.flyTo([inst.lat, inst.lng], 16); abrirDetalhes(inst); };
+            lista.appendChild(div);
+        });
+    }
+
+    function abrirDetalhes(inst) {
+        selecionada = inst;
+        document.getElementById('m-nome').innerText = inst.nome;
+        document.getElementById('m-desc').innerText = inst.descricao || "Instituição cadastrada no Link Up Social.";
+       
+        document.getElementById('btn-rota').onclick = () => {
+            window.open(`https://www.google.com/maps/dir/?api=1&destination=${inst.lat},${inst.lng}`, '_blank');
+        };
+
+        const itensDiv = document.getElementById('m-lista-itens');
+        itensDiv.innerHTML = "";
+        const filtrados = doacGlobal.filter(d => String(d.id_inst) === String(inst.id));
+       
+        filtrados.forEach(d => {
+            const btn = document.createElement('div');
+            btn.className = 'item-necessidade';
+            btn.innerText = `${d.item} (${d.urgencia})`;
+            btn.onclick = () => prepararAgendamento(d.item, false);
+            itensDiv.appendChild(btn);
+        });
+
+        document.getElementById('overlay-detalhes').style.display = 'block';
+        document.getElementById('modal-detalhes').style.display = 'block';
+    }
+
+    function prepararAgendamento(item, espontaneo) {
+        itemSelecionado = item;
+        ehServicoEspontaneo = espontaneo;
+        document.getElementById('resumo-item').innerText = item;
+       
+        const containerDetalhe = document.getElementById('container-detalhe-servico');
+       
+        if (espontaneo) {
+            containerDetalhe.style.display = 'block';
+        } else {
+            containerDetalhe.style.display = 'none';
+        }
+       
+        fecharModais();
+        document.getElementById('overlay-agenda').style.display = 'block';
+        document.getElementById('modal-agenda').style.display = 'block';
+    }
+
+    function enviarWhatsApp() {
+        const d = document.getElementById('f-data').value;
+        const h = document.getElementById('f-hora').value;
+        const n = document.getElementById('f-nome').value;
+        const c = document.getElementById('f-chapa').value;
+        const s = document.getElementById('f-detalhe-servico').value;
+
+        if(!d || !h || !n) return alert("Preencha Data, Hora e seu Nome!");
+        if(ehServicoEspontaneo && !s) return alert("Por favor, descreva o serviço que deseja oferecer!");
+
+        const foneLimpo = String(selecionada.whatsapp).replace(/\D/g, '');
+       
+        // Logica da mensagem
+        let detalheAcao = ehServicoEspontaneo ? `*Serviço Ofertado:* ${s}` : `*Doação:* ${itemSelecionado}`;
+
+        const msg = `*LINK UP SOCIAL* 🤝\n\n` +
+                    `${detalheAcao}\n` +
+                    `*Agendado:* ${d.split('-').reverse().join('/')} às ${h}\n` +
+                    `*Colaborador:* ${n} (Chapa: ${c})\n\n` +
+                    `📍 Instituição: ${selecionada.nome}`;
+
+        window.open(`https://wa.me/${foneLimpo}?text=${encodeURIComponent(msg)}`, '_blank');
+        fecharModais();
+    }
+
+    function fecharModais() {
+        document.querySelectorAll('.overlay, .modal').forEach(el => el.style.display = 'none');
+    }
+
+    carregarDados();
+</script>
+</body>
+</html>
+
+ 

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Up Social 🤝 - Administrador</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root { --azul: #0056b3; --verde: #28a745; --vermelho: #d9534f; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 0; }
+       
+        header { background: var(--azul); color: white; padding: 15px; text-align: center; }
+        h2 { margin: 0; font-size: 1.2rem; }
+
+        #map { height: 250px; width: 100%; border-bottom: 3px solid var(--azul); }
+
+        .container { padding: 15px; }
+        .secao { background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+       
+        label { font-weight: bold; font-size: 0.85rem; color: var(--azul); display: block; margin-top: 10px; }
+        input, select, textarea { width: 100%; padding: 12px; margin-top: 5px; border-radius: 10px; border: 1px solid #ddd; box-sizing: border-box; }
+       
+        .btn { width: 100%; padding: 15px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; margin-top: 15px; color: white; }
+        .btn-salvar { background: var(--azul); }
+        .btn-item { background: var(--verde); }
+       
+        .card-lista {
+            background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px;
+            display: flex; justify-content: space-between; align-items: center;
+            border-left: 5px solid var(--azul); box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .info h4 { margin: 0; color: #333; }
+        .info p { margin: 3px 0; font-size: 0.8rem; color: #777; }
+       
+        .lixeira { background: none; border: none; font-size: 1.4rem; cursor: pointer; color: var(--vermelho); padding: 5px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>⚙️ Painel Administrativo - Link Up</h2>
+    </header>
+
+    <div id="map"></div>
+
+    <div class="container">
+        <div class="secao">
+            <h3>🏢 Cadastrar Instituição</h3>
+            <input type="text" id="inst-nome" placeholder="Nome da Instituição">
+            <input type="text" id="inst-cnpj" placeholder="CNPJ da Empresa">
+            <input type="text" id="inst-tipo" placeholder="Tipo (Ex: Asilo, Creche)">
+            <input type="text" id="inst-whats" placeholder="WhatsApp (55129...)">
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="inst-lat" placeholder="Latitude">
+                <input type="text" id="inst-lng" placeholder="Longitude">
+            </div>
+            <textarea id="inst-desc" placeholder="Descrição da Instituição"></textarea>
+            <button class="btn btn-salvar" onclick="salvarInst()">💾 Salvar Instituição</button>
+        </div>
+
+        <div class="secao">
+            <h3>📦 Cadastrar Necessidade</h3>
+            <label>Selecione a Instituição:</label>
+            <select id="sel-inst">
+                <option value="">Carregando instituições...</option>
+            </select>
+           
+            <input type="text" id="item-nome" placeholder="O que precisam? (Ex: Fralda G)">
+            <select id="item-urgencia">
+                <option value="Normal">Urgência: Normal</option>
+                <option value="Alta">Urgência: ALTA 🚨</option>
+                <option value="Crítica">Urgência: CRÍTICA ⚠️</option>
+            </select>
+            <button class="btn btn-item" onclick="salvarDoac()">➕ Adicionar Item</button>
+        </div>
+
+        <hr>
+        <h3>📋 Gestão de Registros (Lixeira)</h3>
+        <div id="render-geral">Carregando lista...</div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const API_URL = "https://script.google.com/macros/s/AKfycbxtbwFaJXt-U4oIU7d175UF_QEQInOjQBIDOLqmxP8b1gz3_YWR4SARh-r2OrHD-3c/exec";
+
+        let dadosLocais = { instituicoes: [], doacoes: [] };
+        const map = L.map('map').setView([-22.5735, -44.9708], 14);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        async function carregar() {
+            try {
+                const res = await fetch(API_URL);
+                dadosLocais = await res.json();
+               
+                // Preenche o Select
+                const select = document.getElementById('sel-inst');
+                select.innerHTML = '<option value="">Escolha uma Instituição</option>';
+               
+                // Limpa marcadores antigos e desenha novos
+                map.eachLayer((layer) => { if (layer instanceof L.Marker) map.removeLayer(layer); });
+
+                dadosLocais.instituicoes.forEach(i => {
+                    select.innerHTML += `<option value="${i.id}">${i.nome}</option>`;
+                    if(i.lat && i.lng) {
+                        L.marker([i.lat, i.lng]).addTo(map).bindPopup(i.nome);
+                    }
+                });
+
+                renderizarListas();
+            } catch (e) { console.error("Erro ao carregar:", e); }
+        }
+
+        function renderizarListas() {
+            const container = document.getElementById('render-geral');
+            container.innerHTML = "<h4>Instituições:</h4>";
+           
+            dadosLocais.instituicoes.forEach(i => {
+                container.innerHTML += `
+                    <div class="card-lista">
+                        <div class="info">
+                            <h4>${i.nome}</h4>
+                            <p>CNPJ: ${i.cnpj} | ID: ${i.id}</p>
+                        </div>
+                        <button class="lixeira" onclick="confirmarExcluir('${i.id}', 'Instituicao', '${i.nome}')">🗑️</button>
+                    </div>`;
+            });
+
+            container.innerHTML += "<h4>Itens Ativos:</h4>";
+            dadosLocais.doacoes.forEach(d => {
+                const nomeInst = dadosLocais.instituicoes.find(i => i.id == d.id_inst)?.nome || "Instituição";
+                container.innerHTML += `
+                    <div class="card-lista" style="border-left-color: var(--verde);">
+                        <div class="info">
+                            <h4>${d.item}</h4>
+                            <p>Para: ${nomeInst} | Urgência: ${d.urgencia}</p>
+                        </div>
+                        <button class="lixeira" onclick="confirmarExcluir('${d.id_inst}', 'Doacao', '${d.item}')">🗑️</button>
+                    </div>`;
+            });
+        }
+
+        async function salvarInst() {
+            const p = {
+                aba: "Instituicao",
+                nome: document.getElementById('inst-nome').value,
+                cnpj: document.getElementById('inst-cnpj').value,
+                tipo: document.getElementById('inst-tipo').value,
+                whatsapp: document.getElementById('inst-whats').value,
+                lat: document.getElementById('inst-lat').value,
+                lng: document.getElementById('inst-lng').value,
+                descricao: document.getElementById('inst-desc').value,
+                endereco: ""
+            };
+            if(!p.nome || !p.lat) return alert("Preencha o nome e as coordenadas!");
+            await fetch(API_URL, { method: "POST", body: JSON.stringify(p) });
+            alert("Salvo!"); location.reload();
+        }
+
+        async function salvarDoac() {
+            const p = {
+                aba: "Doacao",
+                id_inst: document.getElementById('sel-inst').value,
+                item: document.getElementById('item-nome').value,
+                urgencia: document.getElementById('item-urgencia').value
+            };
+            if(!p.id_inst || !p.item) return alert("Preencha tudo!");
+            await fetch(API_URL, { method: "POST", body: JSON.stringify(p) });
+            alert("Item Adicionado!"); location.reload();
+        }
+
+        function confirmarExcluir(id, aba, nome) {
+            if(confirm(`⚠️ APAGAR REGISTRO?\n\n"${nome}"\nIsso removerá do banco de dados.`)) {
+                apagar(id, aba);
+            }
+        }
+
+        async function apagar(id, aba) {
+            await fetch(`${API_URL}?action=delete&id=${id}&sheet=${aba}`);
+            alert("Excluído com sucesso!");
+            carregar();
+        }
+
+        carregar();
+    </script>
+</body>
+</html>
+
+ 
