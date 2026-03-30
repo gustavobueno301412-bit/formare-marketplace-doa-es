@@ -4,14 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Link Up Social 🤝 - Cliente</title>
-   
+  
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
             --azul-linkup: #0056b3; --verde-acao: #28a745; --bg: #f4f7f6; --branco: #ffffff;
         }
         * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; -webkit-tap-highlight-color: transparent; }
-        body { margin: 0; background-color: var(--bg); display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+       
+        /* Ajuste para evitar corte no mobile (100dvh) */
+        body { margin: 0; background-color: var(--bg); display: flex; flex-direction: column; height: 100dvh; overflow: hidden; }
 
         header {
             background: linear-gradient(135deg, var(--azul-linkup) 0%, #2980b9 100%);
@@ -19,11 +21,12 @@
         }
         header h1 { margin: 0; font-size: 1.3rem; }
 
-        #map { height: 35vh; width: 100%; border-bottom: 4px solid var(--azul-linkup); }
+        #map { height: 35vh; width: 100%; border-bottom: 4px solid var(--azul-linkup); flex-shrink: 0; }
 
         #lista-container {
             flex: 1; padding: 20px; overflow-y: auto; background-color: var(--bg);
             border-radius: 25px 25px 0 0; margin-top: -20px; z-index: 2; position: relative;
+            padding-bottom: 40px; /* Margem extra de segurança para o último card */
         }
 
         .card {
@@ -135,8 +138,17 @@
         try {
             const res = await fetch(API_URL);
             const data = await res.json();
+           
+            // Carrega os dados
             instGlobal = data.instituicoes;
             doacGlobal = data.doacoes;
+
+            // LÓGICA DE EMBARALHAMENTO (Shuffle)
+            for (let i = instGlobal.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [instGlobal[i], instGlobal[j]] = [instGlobal[j], instGlobal[i]];
+            }
+
             renderizar();
         } catch (e) {
             document.getElementById('render-lista').innerText = "Erro ao carregar dados.";
@@ -218,7 +230,6 @@
 
         const foneLimpo = String(selecionada.whatsapp).replace(/\D/g, '');
        
-        // Logica da mensagem
         let detalheAcao = ehServicoEspontaneo ? `*Serviço Ofertado:* ${s}` : `*Doação:* ${itemSelecionado}`;
 
         const msg = `*LINK UP SOCIAL* 🤝\n\n` +
